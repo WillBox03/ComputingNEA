@@ -83,6 +83,11 @@ def findRandomMove(gs, validMoves, returnQueue):
     returnQueue.put(nextMove)
 
 def calculateBoardValue(gs, board):
+    if gs.checkmate:
+        return -CHECKMATE if gs.whiteToMove else CHECKMATE
+    elif gs.stalemate:
+        return STALEMATE
+
     boardValue = 0
     for i in range(len(board)):
         for j in range(len(board)):
@@ -103,16 +108,78 @@ def findBestestMove(gs, validMoves, returnQueue):
     Min = CHECKMATE
 
     '''if gs.whiteToMove:
-        returnQueue.put(minimax(gs, Depth, True, Max, Min)[1])
+        returnQueue.put(minimax(gs, Depth, True)[1])
     else:
-        returnQueue.put(minimax(gs, Depth, False, Max, Min)[1])'''
+        returnQueue.put(minimax(gs, Depth, False)[1])'''
+
+    '''if gs.whiteToMove:
+        returnQueue.put(minimaxabp(gs, Depth, True, Max, Min)[1])
+    else:
+        returnQueue.put(minimaxabp(gs, Depth, False, Max, Min)[1])'''
 
     if gs.whiteToMove:
+        returnQueue.put(minimaxabpmo(gs, Depth, True, Max, Min)[1])
+    else:
+        returnQueue.put(minimaxabpmo(gs, Depth, False, Max, Min)[1])
+
+    '''if gs.whiteToMove:
         returnQueue.put(maxestValue(gs, Depth, CurrentDepth, Max, Min)[1])
     else:
-        returnQueue.put(minestValue(gs, Depth, CurrentDepth, Max, Min)[1])
+        returnQueue.put(minestValue(gs, Depth, CurrentDepth, Max, Min)[1])'''
 
-def minimax(gs, depth, maximizing, alpha, beta):
+def minimax(gs, depth, maximizing):
+    if depth == 0:
+        return calculateBoardValue(gs, gs.board), None
+
+    move = None
+    highestValue = -CHECKMATE if maximizing else CHECKMATE
+    moves = gs.getValidMoves()
+    for currentMove in moves:
+        gs.makeMove(currentMove)
+        if gs.checkmate:
+            tempValue = CHECKMATE if maximizing else -CHECKMATE
+            return tempValue, currentMove
+        elif gs.stalemate:
+            tempValue = STALEMATE
+            return tempValue, currentMove
+        else:
+            tempValue = minimax(gs, depth - 1, not maximizing)[0]
+        if (tempValue > highestValue and maximizing) or (tempValue < highestValue and not maximizing):
+            highestValue = tempValue
+            move = currentMove
+        gs.undoMove()
+    return highestValue, move
+
+def minimaxabp(gs, depth, maximizing, alpha, beta):
+    if depth == 0:
+        return calculateBoardValue(gs, gs.board), None
+
+    move = None
+    highestValue = -CHECKMATE if maximizing else CHECKMATE
+    moves = gs.getValidMoves()
+    for currentMove in moves:
+        gs.makeMove(currentMove)
+        if gs.checkmate:
+            tempValue = CHECKMATE if maximizing else -CHECKMATE
+            return tempValue, currentMove
+        elif gs.stalemate:
+            tempValue = STALEMATE
+            return tempValue, currentMove
+        else:
+            tempValue = minimaxabp(gs, depth - 1, not maximizing, alpha, beta)[0]
+            if maximizing:
+                alpha = max(alpha, tempValue)
+            else:
+                beta = min(beta, tempValue)
+        if (tempValue > highestValue and maximizing) or (tempValue < highestValue and not maximizing):
+            highestValue = tempValue
+            move = currentMove
+        gs.undoMove()
+        if alpha >= beta:
+            break
+    return highestValue, move
+
+def minimaxabpmo(gs, depth, maximizing, alpha, beta):
     if depth == 0:
         return calculateBoardValue(gs, gs.board), None
 
@@ -128,7 +195,7 @@ def minimax(gs, depth, maximizing, alpha, beta):
             tempValue = STALEMATE
             return tempValue, currentMove
         else:
-            tempValue = minimax(gs, depth - 1, not maximizing, alpha, beta)[0]
+            tempValue = minimaxabpmo(gs, depth - 1, not maximizing, alpha, beta)[0]
             if maximizing:
                 alpha = max(alpha, tempValue)
             else:

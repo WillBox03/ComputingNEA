@@ -34,8 +34,8 @@ def main():
   sqSelected = ()
   playerClicks = []
   gameOver = False
-  playerOne = False
-  playerTwo = True
+  playerOne = True
+  playerTwo = False
   AIThinking =False
   moveFinderProcess = None
   moveUndone = False
@@ -86,7 +86,7 @@ def main():
           sqSelected = ()
           playerClicks = []
           moveMade = False
-          animate - False
+          animate = False
           gameOver = False
           if AIThinking:
             moveFinderProcess.terminate()

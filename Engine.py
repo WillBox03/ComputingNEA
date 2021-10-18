@@ -7,12 +7,12 @@ class GameState():
   def __init__(self):
     self.board = np.array([
       ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
-      ['bp', 'bp', 'bp', 'bp', 'bp', '--', '--', 'bp'],
-      ['--', '--', '--', '--', '--', 'bp', '--', '--'],
-      ['--', '--', '--', '--', '--', '--', 'bp', '--'],
-      ['--', '--', '--', '--', 'wp' '--', '--', '--'],
-      ['--', '--', '--', 'wp', '--', '--', '--', '--'],
-      ['wp', 'wp', 'wp', '--', '--', 'wp', 'wp', 'wp'],
+      ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
+      ['--', '--', '--', '--', '--', '--', '--', '--'],
+      ['--', '--', '--', '--', '--', '--', '--', '--'],
+      ['--', '--', '--', '--', '--', '--', '--', '--'],
+      ['--', '--', '--', '--', '--', '--', '--', '--'],
+      ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
       ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
     ])
 
@@ -445,7 +445,7 @@ class GameState():
         endCol = startCol + d[1] * i
         if 0 <= endRow < 8 and 0 <= endCol < 8:
           endPiece = self.board[endRow][endCol]
-          if endPiece[0] == allyColour and endPiece != "K":
+          if endPiece[0] == allyColour and endPiece[1] != "K":
             if possiblePin == ():
               possiblePin = (endRow, endCol, d[0], d[1])
             else:
