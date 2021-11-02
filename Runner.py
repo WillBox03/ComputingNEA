@@ -5,6 +5,7 @@ import Engine
 import ChessAI as AI
 from multiprocessing import Process, Queue
 import time
+import ZobristHashing
 
 BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
@@ -26,6 +27,9 @@ def main():
   screen.fill(p.Color("white"))
   moveLogFont = p.font.SysFont("Arial", 14, False, False)
   gs = Engine.GameState()
+  zobrist = ZobristHashing.ZobristHash()
+  zobrist.Zobrist()
+  generateHash(zobrist.CalculateZobristKey(gs))
   validMoves = gs.getValidMoves()
   moveMade = False 
   animate = False
@@ -35,7 +39,7 @@ def main():
   playerClicks = []
   gameOver = False
   playerOne = True
-  playerTwo = False
+  playerTwo = True
   AIThinking =False
   moveFinderProcess = None
   moveUndone = False
@@ -62,6 +66,7 @@ def main():
             for i in range(len(validMoves)):
               if move == validMoves[i]:
                 gs.makeMove(validMoves[i])
+                generateHash(zobrist.CalculateZobristKey(gs))
                 moveMade = True
                 animate = True
                 sqSelected = ()
@@ -99,13 +104,18 @@ def main():
         print("Thinking...")
         start = time.perf_counter()
         returnQueue = Queue()
-        moveFinderProcess = Process(target=AI.findBestestMove, args=(gs, validMoves, returnQueue))
+        moveFinderProcess = Process(target=AI.findBestMove, args=(gs, validMoves, returnQueue))
         moveFinderProcess.start()
       if not moveFinderProcess.is_alive():
         stop = time.perf_counter()
         print(f"Done Thinking in {stop - start:0.4f} seconds!")
         AIMove = returnQueue.get()
-        gs.makeMove(AIMove)
+        if AIMove == None:
+          gs.makeMove(AI.findRandomMove)
+          generateHash(zobrist.CalculateZobristKey(gs))
+        else:
+          gs.makeMove(AIMove)
+          generateHash(zobrist.CalculateZobristKey(gs))
         moveMade = True
         animate = True
         AIThinking = False
@@ -126,6 +136,10 @@ def main():
 
     clock.tick(MAX_FPS)
     p.display.flip()
+
+def generateHash(ZobristHash):
+  hash = ZobristHash
+  print(hash)
 
 def drawBoard(screen):
   global colours
