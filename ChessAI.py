@@ -101,24 +101,73 @@ def calculateBoardValue(gs, board):
 
     return boardValue
 
-def findBestMove(gs, validMoves, returnQueue):
+def findBestMove(gs, returnQueue, zobristKey, tt):
     Depth = 4
     Max = -CHECKMATE
     Min = CHECKMATE
 
     if gs.whiteToMove:
-        returnQueue.put(minimaxabpmo(gs, Depth, True, Max, Min)[1])
+        returnQueue.put(minimaxabpmott(gs, Depth, True, Max, Min, zobristKey, tt)[1])
     else:
-        returnQueue.put(minimaxabpmo(gs, Depth, False, Max, Min)[1])
+        returnQueue.put(minimaxabpmott(gs, Depth, False, Max, Min, zobristKey, tt)[1])
 
-def minimaxabpmo(gs, depth, maximizing, alpha, beta):
+def minimaxabpmott(gs, depth, maximizing, alpha, beta, zobristKey, tt):
+    
+    ttLookupValue = tt.lookupEval(zobristKey, depth)
+    if ttLookupValue != False:
+        return ttLookupValue, None
 
     if depth == 0:
         return calculateBoardValue(gs, gs.board), None
+        #return quiescenceSearch(gs,4 , maximizing, alpha, beta), None
 
     move = None
     highestValue = -CHECKMATE if maximizing else CHECKMATE
     moves = orderMoves(gs.getValidMoves())
+    for currentMove in moves:
+        gs.makeMove(currentMove)
+        zobristKey = gs.returnZobrist()
+        if gs.checkmate:
+            tempValue = CHECKMATE if maximizing else -CHECKMATE
+            return tempValue, currentMove
+        elif gs.stalemate:
+            tempValue = STALEMATE
+            return tempValue, currentMove
+        else:
+            tempValue = minimaxabpmott(gs, depth - 1, not maximizing, alpha, beta, zobristKey, tt)[0]
+            tt.storeEval(zobristKey, tempValue, depth, None)
+            if maximizing:
+                alpha = max(alpha, tempValue)
+            else:
+                beta = min(beta, tempValue)
+        if (tempValue > highestValue and maximizing) or (tempValue < highestValue and not maximizing):
+            highestValue = tempValue
+            move = currentMove
+        gs.undoMove()
+        if alpha >= beta:
+            break
+    return highestValue, move
+
+
+def quiescenceSearch(gs, depth, maximizing, alpha, beta):
+
+    moves = orderMoves(gs.getValidMoves(True))
+    if len(moves) == 0 or depth == 0:
+        return calculateBoardValue(gs, gs.board), None
+
+    standPat = calculateBoardValue(gs, gs.board)
+    if standPat >= beta:
+        return beta
+    if alpha < standPat:
+        alpha = standPat
+    
+    moves = orderMoves(gs.getValidMoves(True))
+
+    if depth == 0:
+        return standPat
+
+    move = None
+    highestValue = -CHECKMATE if maximizing else CHECKMATE
     for currentMove in moves:
         gs.makeMove(currentMove)
         if gs.checkmate:
@@ -128,7 +177,7 @@ def minimaxabpmo(gs, depth, maximizing, alpha, beta):
             tempValue = STALEMATE
             return tempValue, currentMove
         else:
-            tempValue = minimaxabpmo(gs, depth - 1, not maximizing, alpha, beta)[0]
+            tempValue = quiescenceSearch(gs, depth -1 , not maximizing, alpha, beta)[0]
             if maximizing:
                 alpha = max(alpha, tempValue)
             else:

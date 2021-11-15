@@ -1,12 +1,13 @@
 import numpy as np
 import os.path
 
-PieceTypeIndexConversion = {"K": 0, "p" : 1, "N" : 2, "B" : 3, "R" : 4, "Q" : 5}
-
-class ZobristHash:
+class ZobristKey:
+    
+    PieceTypeIndexConversion = {"K": 0, "p" : 1, "N" : 2, "B" : 3, "R" : 4, "Q" : 5 }
 
     def __init__(self):
         
+        self.pieceTypeIndexConversion = {"K": 0, "p" : 1, "N" : 2, "B" : 3, "R" : 4, "Q" : 5 }
         self.seed = np.random.seed(2361912)
         self.randomNumbersFileName = "RandomNumbers.txt"
         self.piecesArray = np.empty([6, 2, 64], dtype = np.uint64)
@@ -63,25 +64,19 @@ class ZobristHash:
 
         self.ZobristKey = np.uint64(0)
         self.board = gs.board
-        self.squareCount = 0
 
         for rank in range(len(self.board)):
             for file in range(len(self.board)):
                 if self.board[rank][file] != "--":
-                    self.pieceType = PieceTypeIndexConversion[self.board[rank][file][1]]
+                    self.squareCount = (file + (rank * 8))
+                    self.pieceType = self.PieceTypeIndexConversion[self.board[rank][file][1]]
                     self.pieceColour = 0 if self.board[rank][file][0] == "w" else 1
-
-                    self.ZobristKey = np.bitwise_xor(self.ZobristKey, self.piecesArray[self.pieceType, self.pieceColour, self.squareCount])
-                
-                self.squareCount += 1
+                    
+                    self.ZobristKey = np.bitwise_xor(self.ZobristKey, self.piecesArray[self.pieceType, self.pieceColour, self.squareCount])   
         
         self.enPassantIndex = gs.enPassantPossible
         if self.enPassantIndex != ():
             self.ZobristKey = np.bitwise_xor(self.ZobristKey, self.enPassantFile[self.enPassantIndex[1]])
-            
-        self.whiteToMove = gs.whiteToMove
-        if self.whiteToMove:
-            self.ZobristKey = np.bitwise_xor(self.ZobristKey, self.sideToMove)
 
         self.listOfCastlingRights = gs.currentCastlingRight
         self.castleRightsIndex = 0
@@ -90,9 +85,15 @@ class ZobristHash:
         self.castleRightsIndex += 4 if self.listOfCastlingRights.wqs else 0 
         self.castleRightsIndex += 8 if self.listOfCastlingRights.bqs else 0 
 
-        self.ZobristKey = np.bitwise_xor(self.ZobristKey,self.castlingRights[self.castleRightsIndex])
-
-        return np.binary_repr(self.ZobristKey)
+        self.ZobristKey = np.bitwise_xor(self.ZobristKey,self.castlingRights[self.castleRightsIndex])  
+        
+        self.whiteToMove = gs.whiteToMove
+        if self.whiteToMove:
+            self.ZobristKey = np.bitwise_xor(self.ZobristKey, self.sideToMove)
+        
+        print(self.ZobristKey)
+        
+        return self.ZobristKey
 
     def randomUnsigned64BitInteger(self):
         self.random64BitInteger = np.random.randint(0, 18446744073709551615, dtype = np.uint64)

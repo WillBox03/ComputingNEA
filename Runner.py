@@ -5,7 +5,7 @@ import Engine
 import ChessAI as AI
 from multiprocessing import Process, Queue
 import time
-import ZobristHashing
+import TranspositionTable
 
 BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
@@ -27,9 +27,7 @@ def main():
   screen.fill(p.Color("white"))
   moveLogFont = p.font.SysFont("Arial", 14, False, False)
   gs = Engine.GameState()
-  zobrist = ZobristHashing.ZobristHash()
-  zobrist.Zobrist()
-  generateHash(zobrist.CalculateZobristKey(gs))
+  tt = TranspositionTable.TranspositionTable(64000)
   validMoves = gs.getValidMoves()
   moveMade = False 
   animate = False
@@ -39,7 +37,7 @@ def main():
   playerClicks = []
   gameOver = False
   playerOne = True
-  playerTwo = True
+  playerTwo = False
   AIThinking =False
   moveFinderProcess = None
   moveUndone = False
@@ -66,7 +64,8 @@ def main():
             for i in range(len(validMoves)):
               if move == validMoves[i]:
                 gs.makeMove(validMoves[i])
-                generateHash(zobrist.CalculateZobristKey(gs))
+                zobristKey = gs.returnZobrist()
+                print(zobristKey)
                 moveMade = True
                 animate = True
                 sqSelected = ()
@@ -76,6 +75,7 @@ def main():
       elif e.type == p.KEYDOWN:
         if e.key == p.K_z:
           gs.undoMove()
+          zobristKey = gs.returnZobrist()
           sqSelected = ()
           playerClicks = []
           moveMade = True
@@ -104,7 +104,7 @@ def main():
         print("Thinking...")
         start = time.perf_counter()
         returnQueue = Queue()
-        moveFinderProcess = Process(target=AI.findBestMove, args=(gs, validMoves, returnQueue))
+        moveFinderProcess = Process(target=AI.findBestMove, args=(gs, returnQueue, zobristKey, tt))
         moveFinderProcess.start()
       if not moveFinderProcess.is_alive():
         stop = time.perf_counter()
@@ -112,10 +112,10 @@ def main():
         AIMove = returnQueue.get()
         if AIMove == None:
           gs.makeMove(AI.findRandomMove)
-          generateHash(zobrist.CalculateZobristKey(gs))
         else:
           gs.makeMove(AIMove)
-          generateHash(zobrist.CalculateZobristKey(gs))
+        zobristKey = gs.returnZobrist()
+        print(zobristKey)
         moveMade = True
         animate = True
         AIThinking = False
@@ -136,10 +136,6 @@ def main():
 
     clock.tick(MAX_FPS)
     p.display.flip()
-
-def generateHash(ZobristHash):
-  hash = ZobristHash
-  print(hash)
 
 def drawBoard(screen):
   global colours

@@ -1,9 +1,10 @@
 import copy
 import numpy as np
+import ZobristKey
 
 pieceValues = {"p": 100, "N": 300, "B": 300, "R": 500, "Q": 900, "K": 0}
 
-class GameState():
+class GameState:
   def __init__(self):
     self.board = np.array([
       ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
@@ -15,7 +16,7 @@ class GameState():
       ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
       ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
     ])
-
+    
     self.moveFunctions = {"p" : self.getPawnMoves, "R" : self.getRookMoves, "B" : self.getBishopMoves, "N" : self.getKnightMoves, "Q" : self.getQueenMoves, "K" : self.getKingMoves}
     self.promotionOptions = ("Q", "R", "B", "N")
     self.whiteToMove = True
@@ -31,6 +32,11 @@ class GameState():
     self.enPassantPossibleLog = [self.enPassantPossible]
     self.currentCastlingRight = CastleRights(True, True, True, True)
     self.castleRightsLog = [CastleRights(self.currentCastlingRight.wks, self.currentCastlingRight.bks, self.currentCastlingRight.wqs, self.currentCastlingRight.bqs)]
+    
+    self.zobrist = ZobristKey.ZobristKey()
+    self.zobrist.Zobrist()
+    self.zobristKey = self.zobrist.CalculateZobristKey(self)
+    self.zobristKeyLog = [self.zobristKey]
 
   def makeMove(self, move):
     self.board[move.startRow][move.startCol] = "--"
@@ -43,12 +49,17 @@ class GameState():
       self.blackKingLocation = (move.endRow, move.endCol)
 
     if move.pieceMoved[1] == "p" and abs(move.startRow - move.endRow) == 2:
-      self.enPassantPossible = ((move.endRow + move.startRow) // 2, move.endCol)
+      if move.startCol < 7:
+        if (move.pieceMoved[0] == "w" and (self.board[move.endRow][move.startCol + 1] == "bp" or self.board[move.endRow][move.startCol - 1] == "bp")) or (move.pieceMoved[0] == "b" and (self.board[move.endRow][move.startCol - 1] == "wp" or self.board[move.endRow][move.startCol + 1] == "wp")):
+          self.enPassantPossible = ((move.endRow + move.startRow) // 2, move.endCol)
+      else:
+        if (move.pieceMoved[0] == "w" and self.board[move.endRow][move.startCol - 1] == "bp") or (move.pieceMoved[0] == "b" and self.board[move.endRow][move.startCol - 1] == "wp"):
+          self.enPassantPossible = ((move.endRow + move.startRow) // 2, move.endCol)
     else:
       self.enPassantPossible = ()
     
     self.enPassantPossibleLog.append(self.enPassantPossible)
-
+    
     if move.enPassant:
       self.board[move.startRow][move.endCol] = "--"
 
@@ -61,14 +72,36 @@ class GameState():
 
     self.updateCastleRights(move)
     self.castleRightsLog.append(CastleRights(self.currentCastlingRight.wks, self.currentCastlingRight.bks, self.currentCastlingRight.wqs, self.currentCastlingRight.bqs))
-
+    
     if move.castle:
       if move.endCol - move.startCol == 2:
         self.board[move.endRow][move.endCol - 1] = self.board[move.endRow][move.endCol + 1]
         self.board[move.endRow][move.endCol + 1] = "--"
+        self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[4, move.pieceMovedColour, move.endSquareNum - 1])
+        self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[4, move.pieceMovedColour, move.endSquareNum + 1])
       else:
         self.board[move.endRow] [move.endCol + 1] = self.board[move.endRow][move.endCol - 2]
         self.board[move.endRow][move.endCol - 2] = "--"
+        self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[4, move.pieceMovedColour, move.endSquareNum - 2])
+        self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[4, move.pieceMovedColour, move.endSquareNum + 1])
+         
+    self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[move.pieceCapturedType, move.pieceCapturedColour, move.captureSquareNum]) if move.isCapture else self.zobristKey
+    self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[move.pieceMovedType, move.pieceMovedColour, move.startSquareNum])
+    self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.piecesArray[move.pieceMovedType, move.pieceMovedColour, move.endSquareNum])
+
+    if self.enPassantPossible != ():
+      self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.enPassantFile[self.enPassantPossible[1]])
+    elif self.enPassantPossible == () and self.enPassantPossibleLog[-2] != ():
+      self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.enPassantFile[self.enPassantPossibleLog[-2][1]])
+      
+    if self.castleRightsLog[-2].castleRightsIndex != self.castleRightsLog[-1].castleRightsIndex:
+      self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.castlingRights[self.castleRightsLog[-2].castleRightsIndex])
+      self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.castlingRights[self.castleRightsLog[-1].castleRightsIndex])
+    
+    self.zobristKey = np.bitwise_xor(self.zobristKey, self.zobrist.sideToMove)
+    
+    self.zobristKeyLog.append(self.zobristKey)
+      
 
   def undoMove(self):
     if len(self.moveLog) != 0:
@@ -102,7 +135,12 @@ class GameState():
       
       self.checkmate = False
       self.stalemate = False
-
+      
+      self.zobristKeyLog.pop()
+      self.zobristKey = self.zobristKeyLog[-1]
+      
+  def returnZobrist(self):
+    return self.zobristKey
 
   def updateCastleRights(self, move):
     if move.pieceMoved == "wK":
@@ -137,7 +175,7 @@ class GameState():
         elif move.endCol == 7:
           self.currentCastlingRight.bks = False
   
-  def getValidMoves(self):
+  def getValidMoves(self, onlyCaptures = False):
     moves = []
     self.inCheck, self.pins, self.checks = self.checkForPinsAndChecks()
     if self.whiteToMove:
@@ -179,6 +217,11 @@ class GameState():
     else:
       self.checkmate = False
       self.stalemate = False
+
+    if onlyCaptures:
+      for i in range(len(moves) -1, -1, -1):
+        if moves[i - 1].isCapture == False:
+          moves.remove(moves[i])
 
     return moves
 
@@ -483,7 +526,13 @@ class CastleRights():
     self.wks = wks
     self.bks = bks
     self.wqs = wqs
-    self.bqs = bqs      
+    self.bqs = bqs
+      
+    self.castleRightsIndex = 0
+    self.castleRightsIndex += 1 if self.wks else 0 
+    self.castleRightsIndex += 2 if self.bks else 0 
+    self.castleRightsIndex += 4 if self.wqs else 0 
+    self.castleRightsIndex += 8 if self.bqs else 0     
 
 class Move():
 
@@ -491,14 +540,21 @@ class Move():
   rowsToRanks = {v: k for k, v in ranksToRows.items()}
   filesToCols = {"a" : 0, "b" : 1, "c" : 2, "d" : 3, "e" : 4, "f" : 5, "g" : 6, "h" : 7}
   colsToFiles = {v: k for k, v in filesToCols.items()}
+  pieceTypeIndexConversion = {"K": 0, "p" : 1, "N" : 2, "B" : 3, "R" : 4, "Q" : 5 }
 
   def __init__(self, startSq, endSq, board, enPassant = False, castle = False):
     self.startRow = startSq[0]
     self.startCol = startSq[1]
+    self.startSquareNum = self.startCol + (self.startRow * 8)
     self.endRow = endSq[0]
     self.endCol = endSq[1]
+    self.endSquareNum = self.endCol + (self.endRow * 8)
+    self.captureSquareNum = self.endSquareNum
     self.pieceMoved = board[self.startRow][self.startCol]
-    self.pieceCaptured = board[self.endRow][self.endCol]
+    if self.pieceMoved != "--":
+      self.pieceMovedType = self.pieceTypeIndexConversion[self.pieceMoved[1]]
+      self.pieceMovedColour = 0 if self.pieceMoved[0] == "w" else 1
+    self.pieceCaptured = board[self.endRow][self.endCol] 
     self.castle = castle
 
     self.pawnPromotion = (self.pieceMoved == "wp" and self.endRow == 0) or (self.pieceMoved == "bp" and self.endRow == 7)
@@ -506,8 +562,12 @@ class Move():
     self.enPassant = enPassant
     if enPassant:
       self.pieceCaptured = "wp" if self.pieceMoved == "bp" else "bp"
-    
+      self.captureSquareNum = self.endCol + (self.startRow * 8)
+      
     self.isCapture = self.pieceCaptured != "--"
+    if self.isCapture:
+      self.pieceCapturedType = self.pieceTypeIndexConversion[self.pieceCaptured[1]]
+      self.pieceCapturedColour = 0 if self.pieceCaptured[0] == "w" else 1
 
     self.moveID = self.startRow * 1000 + self.startCol * 100 + self.endRow * 10 + self.endCol
 
