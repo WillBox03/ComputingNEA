@@ -27,5 +27,3 @@ class TranspositionTable:
                 return self.lookupEntry[1]
             
         return False
-    
-tt = TranspositionTable(64000)
